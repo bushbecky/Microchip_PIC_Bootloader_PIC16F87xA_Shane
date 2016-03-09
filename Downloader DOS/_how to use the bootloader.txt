@@ -1,0 +1,11 @@
+*************************
+How to use the bootloader
+
+First, download the Windows distribution of the PIC16F876 from http://www.workingtex.com/htpic.
+Get it working, then substitute this DOS downloader for it.
+
+The default options for the bootloader are 19200bps.
+
+A sample command line would be, for 19200bps, serial port COM1:
+
+c:\DOWNLDR -S19200 -PCOM1 TEST.HEX

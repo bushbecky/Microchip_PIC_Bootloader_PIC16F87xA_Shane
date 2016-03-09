@@ -1,0 +1,38 @@
+
+   PIC Bootloader + 					Eindhoven, September 2004
+   
+
+   Most PIC applications that I develop include serial link to commuciate to some terminal-console program so I 
+   thought it would be handy to integrate a serial console into this Bootloader. The console was inspired on the 
+   very nice straightforward OC- console by www.castlesoft.de. 
+   
+   The original bootloader was made by Petr Kolomaznik (Czech Republic). http://www.ehl.cz/pic, 
+   email: kolomaznik@ehl.cz. PICbootPlus is based on the Delphi sources (1.0.8.0  25.7.2001) provided 
+   by (C)2000-2001 EHL elektronika.
+
+   All enthousiasts developing PIC applications are free to use this software. I have included  the BCB source 
+   code for those who like to make something better out of it. Comments are welcome but I cannot guarantee 
+   quick response or even any response at all. 
+
+   How to use: Same as bootloader provided by Petr Kolomaznik. The console works immediatly after startup and 
+   almost immediatly after bootloading. You may select baudrates for the console independantly from the bootloader.
+   The lines on the console will wrap after 40 characters. Non printable ASCII characters  0 and 9 show up as ASCII 254. 
+
+   Version history Bootloader+ :
+
+   V1.01 - Initial version, works with PIC16F87# and .hex files provided with 1.08 EHL bootloader.
+   V1.02 - Version also works on W98, NT4 and XP
+
+   Known problems : 
+
+   1. Console not immediatly ready to receive characters after bootload. I think it has 
+   something to do with timeout parameters of communication port. I consider this a minor 
+   problem, just reset te PIC again.
+
+
+
+	Herman Aartsen
+	TNO - The Netherlands
+	Eindhoven
+
+	HermanAartsen@yahoo.co.uk.

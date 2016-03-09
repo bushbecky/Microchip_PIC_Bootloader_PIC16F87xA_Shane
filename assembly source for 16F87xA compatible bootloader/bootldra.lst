@@ -1,0 +1,1347 @@
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001 ;******************************************************************************
+                      00002 ;   Bootloader for Microchip PIC16F870/871/873/874/876A/877A                  *
+                      00003 ;                     (c) 2000-2002, Petr Kolomaznik                          *
+                      00004 ;                          Freely distributable                               *
+                      00005 ;******************************************************************************
+                      00006 ;                                                                             *
+                      00007 ; Original Author:   Petr Kolomaznik                                          *
+                      00008 ; Company:           EHL elektronika, Czech Republic                          *
+                      00009 ; Email:             kolomaznik@ehl.cz                                        *
+                      00010 ; Url:               www.ehl.cz/pic                                           *
+                      00011 ; Modified by:       Shane Tolmie                                             *
+                      00012 ; Company:           DesignREM                                                *
+                      00013 ; Email:             shane.tolmie@microchipc.com                              *
+                      00014 ; Url:               www.microchipc.com                                       *
+                      00015 ; Modified by:       Peter Huemer                                             *
+                      00016 ; Company:           HTBLA Steyr, Abt. Elektronik / Techn. Informatik         *
+                      00017 ; Email:             p.huemer@eduhi.at                                        *
+                      00018 ; Url:               www.htl-steyr.ac.at                                      *
+                      00019 ;                                                                             *
+                      00020 ;******************************************************************************
+                      00021 ; How to use this bootloader:                                                 *
+                      00022 ; - open project in MPLAB                                                     *
+                      00023 ; - check and modify of parameters in the user setting section with <<< mark  *
+                      00024 ; - make project with MPLAB and MPASM                                         *
+                      00025 ; - use any programmer for programming of bootldr.hex to microcontroller      *
+                      00026 ; - set configuration bits                                                    *
+                      00027 ; - use PIC downloader program for user program download                      *
+                      00028 ; - check if user program doesn't use the top 214 program memory locations    *
+                      00029 ;                                                                             *
+                      00030 ; Notes:                                                                      *
+                      00031 ; - tab size for editor is 2                                                  *
+                      00032 ;******************************************************************************
+                      00033 ; 2.81 - 24.12.2005 (Shane Tolmie [shane@microchipc.com and Nozomu Muto       *
+                      00034 ;   re8n-mtu@asahi-net.or.jp. See version readme file.                        *
+                      00035 ; 2.80 - 27.08.2005 (Shane Tolmie [shane@microchipc.com and Herman Aartsen    *
+                      00036 ;    h.aartsen@chello.nl). Added warning note about BOR and dirty power       *
+                      00037 ;    supplies leading to the PIC dying.                                       *
+                      00038 ; 2.70 - 24.09.2004 (Shane Tolmie [shane@microchipc.com and Peter Huemer      *
+                      00039 ;    p.huemer@eduhi.at). Fixed quad-alignment problem with 16F87xA devices.   *
+                      00040 ;  The code used to fail unless the .hex file had a length that wasn't a    *
+                      00041 ;    multiple  of 4.                                                          *
+                      00042 ; 2.60 - 29.12.2002 (Shane Tolmie [shane@microchipc.com])                     *
+                      00043 ;  - made it so that frequencies <=4Mhz have XT, and freq >4Mhz have HS       *
+                      00044 ;    configuration in the fuse bits, to enable it to work at all freq with    *
+                      00045 ;    resonators.                                                              *
+                      00046 ; 2.50 - 28.8.2002 (Shane Tolmie [shane@microchipc.com])                      *
+                      00047 ;  - switched off BODEN which resets part if low voltage power supply used    *
+                      00048 ;    (many grateful thanks to Richard (joshanks@earthlink.net)                *
+                      00049 ; 2.50 - 28.8.2002 (Shane Tolmie [shane@microchipc.com])                      *
+                      00050 ;  - switched off BODEN which resets part if low voltage power supply used    *
+                      00051 ;    (many grateful thanks to Richard (joshanks@earthlink.net)                *
+                      00052 ; 2.20 - 8.8.2001 (Shane Tolmie [shane@microchipc.com])                       *
+                      00053 ;  - added watchdog user change, defaults to off (leaving it on can create    *
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00054 ;    difficult to track down problems)                                        *
+                      00055 ; 2.10 - 3.8.2001 (jvo@vinylium.ch)                                           *
+                      00056 ;  - substantially reduced size of program                                    *
+                      00057 ;  - restores USART to reset condition before starting user program           *
+                      00058 ;  - made user program start variable                                         *
+                      00059 ;  - added trap to avoid unintended running into bootloader                   *
+                      00060 ;  - watchdog timeout is directly handled over to user program                *
+                      00061 ; 2.00 - 30.03.2001 (Shane Tolmie [shane@microchipc.com])                     *
+                      00062 ;  - for the 16F876, the 4 instructions in the original .hex file at 0x0000   *
+                      00063 ;    to 0x0003 are copied to 0x1F00 to 0x1F03, and executed once the          *
+                      00064 ;    bootloader is finished, to jump back to user code. The reset vector in   *
+                      00065 ;    the chip at 0x0000 to 0x0003 points to the bootloader.  Inserted a       *
+                      00066 ;    pagesel 0x0000 (2 instructions) at 0x1F00 to make a short jump into a    *
+                      00067 ;    long jump so it would work with .hex files that didnt have a long jump   *
+                      00068 ;    as the first 4 instructions in the .hex file.                            *
+                      00069 ;    This addition dramatically increases compatibility with .hex files.      *
+                      00070 ; 1.06 - 30.03.2001 (Shane Tolmie)                                            *
+                      00071 ;  - added config bits                                                        *
+                      00072 ;  - program now jumps immediately to user program after download             *
+                      00073 ; 1.02 - 15.11.2000                                                           *
+                      00074 ;  - added check of user constants                                            *
+                      00075 ;  - added support for the new 16F870/1/2                                     *
+                      00076 ;  - added errorlevel directive for message 302 and 306                       *
+                      00077 ;******************************************************************************
+                      00078 
+                      00079   ;;;;;;;;;vvv 2005-12-22mn
+                      00080   #define  PICC_LITE_950
+                      00081   ;;;;;;;;;^^^ 2005-12-22mn
+                      00082 
+                      00083   errorlevel -302, -305, -306   ; no message 302 and 306
+                      00084   list       b=2      ; tabulator size = 2
+                      00085 
+                      00086 ;================== User setting section ======================================
+                      00087 
+                      00088   list p=16f877a      ; <<< set type of microcontroller  (16f873a or 16f876a)
+                      00089 ;     set same microcontroller in the project
+                      00090   #define ICD_DEBUG 0   ; <<< if using MPLAB ICD Debugger, moves bootloader down 256 bytes to make room 
+                            for it [0|1]
+                      00091   #define FOSC D'20000000'  ; <<< set quartz frequence [Hz], max. 20 MHz
+                      00092   ;#define BAUD D'38400'    ; <<< set baud rate [bit/sec]
+                      00093   #define BAUD D'19200'   ; <<< set baud rate [bit/sec]
+                      00094   #define BAUD_ERROR  D'4'  ; <<< set baud rate error [%]
+                      00095   #define TIME      ; <<< set method of bootloader start PIN/TIME
+                      00096           ;     PIN : start on low level of trigger pin
+                      00097                                 ;     TIME: start on receive IDENT byte in TIMEOUT
+                      00098     #define TRIGGER   PORTB,7 ; <<< only for PIN - set PORT_X,PIN_NR
+                      00099   #define TIMEOUT   D'2'  ; <<< only for TIME - set time [0.1s], max. 25 sec
+                      00100   #define WATCHDOGTIMER 0   ; <<< Watchdog timer default OFF/ON [0|1]
+                      00101 
+                      00102 ;=================== Configuration ============================================
+                      00103 
+2000   0002 0001 0000 00104   __IDLOCS H'2100'    ; version ID of bootloader
+       0000 
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00105 
+                      00106   IF WATCHDOGTIMER == 0
+                      00107     #define MY_WDT _WDT_OFF
+                      00108   ELSE
+                      00109     #define MY_WDT _WDT_ON
+                      00110   ENDIF
+                      00111 
+                      00112   IF FOSC<=D'4000000'
+                      00113     #define _MYCRYSTAL _XT_OSC ;see datasheet
+                      00114   ELSE
+                      00115     #define _MYCRYSTAL _HS_OSC
+                      00116   ENDIF
+                      00117 
+                      00118   ;note: for high voltage parts, you can set BODEN_ON, but for low voltage parts
+                      00119   ;it resets the circuit continuously!
+                      00120 
+                      00121   ;NOTE: IF AT ALL POSSIBLE, SET BROWN OUT DETECT TO 'ON' TO AVOID DIRTY POWER
+                      00122   ;SUPPLIES KILLING THE PIC MEMORY
+                      00123 
+                      00124   ;--start email from Herman Aartsen--
+                      00125   ;Dear Shane,
+                      00126   ;
+                      00127   ;Although I'm still very positive about the PIC16F877 boatloader I have
+                      00128   ;recently expierenced a very nasty side effect I think others should know about
+                      00129   ;it before they start using it for their rocket detonators, breathing devices
+                      00130   ;etc.
+                      00131   ;
+                      00132   ;At the research institute where I work, I have added the bootloader to the
+                      00133   ;firmware of about a 100 sensors. This has proven to be very handy for field
+                      00134   ;upgrading, changing calibration tables etc.  But after a while sensors started
+                      00135   ;coming back. When I readback the code, I noticed a few bits of code had
+                      00136   ;changed. Very scary !!!
+                      00137   ;
+                      00138   ;So I spend some of time finding the cause. I made a little 'spurious write
+                      00139   ;detection' program that compares the lower half of the code memory with the
+                      00140   ;upper half where I put a mirror of the code. When I programmed this into a
+                      00141   ;PIC16F877 (using ICD2) and connected the device to a 'very very dirty power
+                      00142   ;supply' I carried out the following experiments:
+                      00143   ;
+                      00144   ;- with a bootloader, Brownout Detect (BOR)=off, Power Up Timer=off, LVP=on:
+                      00145   ;spurious writes after a just few power interrupts;
+                      00146   ;
+                      00147   ;- without bootloader, same config setting: no problem after many power
+                      00148   ;interrupts;
+                      00149   ;
+                      00150   ;- with bootloader, with BOR on: also no problems after many power interrupts;
+                      00151   ;
+                      00152   ;Conclusion: never use this bootloader with the BOR switched off!
+                      00153   ;
+                      00154   ;I think you should put this warning very loud and clear to all the user of
+                      00155   ;this bootloader.
+                      00156   ;
+                      00157   ;Kind Regards,
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00158   ;
+                      00159   ;Herman Aartsen.
+                      00160   ;
+                      00161   ;Note: most user would not even get the bootloader working if the BOR was
+                      00162   ;enabled by default turning on the BOR makes the bootloader inoperable with
+                      00163   ;low voltage PIC's. For this reason, and others (including the inability of a
+                      00164   ;PIC18F2550 to erase its code protection bits unless the voltage is 5V) I would
+                      00165   ;highly recommend running your PIC at 5V and turning the BOR bit on
+                      00166   ;
+                      00167   ;Shane Tolmie (www.microchipc.com)
+                      00168   ;
+                      00169   ;--end email from Herman Aartsen--
+                      00170 
+2007   3F32           00171   __CONFIG _CP_OFF & _WDT_OFF & _BODEN_OFF & _PWRTE_ON & _MYCRYSTAL & _WRT_OFF & _LVP_OFF & _DEBUG_OFF &
+                             _CPD_OFF
+                      00172 
+                      00173 ;=============== End of user setting section ==================================
+                      00174 
+                      00175 
+                      00176 ;================== Check User Constants ======================================
+                      00177 
+                      00178   IFNDEF FOSC
+                      00179     ERROR "FOSC must be defined"
+                      00180   ENDIF
+                      00181 
+                      00182   IFNDEF BAUD
+                      00183     ERROR "BAUD must be defined"
+                      00184   ENDIF
+                      00185 
+                      00186   IF FOSC > D'20000000'
+                      00187     ERROR "max. quartz frequency = 20 MHz"
+                      00188   ENDIF
+                      00189 
+                      00190   IFNDEF PIN
+                      00191     IFNDEF TIME
+                      00192       ERROR "wrong start method of bootloader, must be PIN or TIME"
+                      00193     ENDIF
+                      00194   ENDIF
+                      00195 
+                      00196   IF TIMEOUT > D'254'
+                      00197     ERROR "max. timeout = 25.4 sec"
+                      00198   ENDIF
+                      00199 
+                      00200   IF ICD_DEBUG != 0
+                      00201     IF ICD_DEBUG != 1
+                      00202       ERROR "ICD debug must be 1 (enabled) or 0 (not used)"
+                      00203     ENDIF
+                      00204   ENDIF
+                      00205 
+                      00206 ;========================== Constants =========================================
+                      00207 
+                      00208   IF ((FOSC/(D'16' * BAUD))-1) < D'256'
+                      00209     #define DIVIDER (FOSC/(D'16' * BAUD))-1
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00210     #define HIGH_SPEED 1
+                      00211   ELSE
+                      00212     #define DIVIDER (FOSC/(D'64' * BAUD))-1
+                      00213     #define HIGH_SPEED 0
+                      00214   ENDIF
+                      00215 
+  00004B1E            00216 BAUD_REAL EQU FOSC/((D'64'-(HIGH_SPEED*D'48'))*(DIVIDER+1))
+                      00217 
+                      00218   IF BAUD_REAL > BAUD
+                      00219     IF (((BAUD_REAL - BAUD)*D'100')/BAUD) > BAUD_ERROR
+                      00220       ERROR "wrong baud rate"
+                      00221     ENDIF
+                      00222   ELSE
+                      00223     IF (((BAUD - BAUD_REAL)*D'100')/BAUD) > BAUD_ERROR
+                      00224       ERROR "wrong baud rate"
+                      00225     ENDIF
+                      00226   ENDIF
+                      00227 
+                      00228   IF FOSC > D'10240000'
+                      00229     #define T1PS 8
+                      00230     #define T1SU 0x31
+                      00231   ELSE
+                      00232     IF FOSC > D'5120000'
+                      00233       #define T1PS 4
+                      00234       #define T1SU 0x21
+                      00235     ELSE
+                      00236       IF FOSC > D'2560000'
+                      00237         #define T1PS 2
+                      00238         #define T1SU 0x11
+                      00239       ELSE
+                      00240         #define T1PS 1
+                      00241         #define T1SU 0x01
+                      00242       ENDIF
+                      00243     ENDIF
+                      00244   ENDIF
+                      00245 
+  00000BDE            00246 TIMER EQU (D'65538'-(FOSC/(D'10'*4*T1PS))); ; reload value for TIMER1 (0.1s int)
+                      00247 
+                      00248 ;>>> ADAPT
+                      00249   IFDEF __16F873A
+                      00250       #include <p16f873a.inc>
+                      00251       #define ProgHI 0x0FFF
+                      00252     ELSE
+                      00253     IFDEF __16F876A
+                      00254         #include <p16f876a.inc>
+                      00255           #define ProgHI 0x1FFF
+                      00256       ELSE
+                      00257       IFDEF __16F877A
+                      00258           #include <p16f877a.inc>
+                      00001         LIST
+                      00002 ; P16F877A.INC  Standard Header File, Version 1.00    Microchip Technology, Inc.
+                      00398         LIST
+                      00259             #define ProgHI 0x1FFF
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00260         ELSE
+                      00261             ERROR   "incorrect type of microcontroller"
+                      00262         ENDIF
+                      00263       ENDIF
+                      00264     ENDIF
+                      00265 ;>>>
+                      00266 
+                      00267 ;>>> ADAPT
+                      00268 #define LoaderSize  0x180                     ; size of bootloader (not yet optimized)
+                      00269 ;>>>
+                      00270 
+                      00271 ; #define LoaderMain  UserStart+5     ; main address of bootloader
+                      00272 #define LoaderTop   ProgHI-(ICD_DEBUG*0x100)        ; top address of bootloader
+                      00273 #define LoaderStart (LoaderTop)-LoaderSize+1        ; start address of bootloader
+                      00274 
+                      00275 #define NumRetries  1       ; number of writing retries
+                      00276 
+                      00277 
+                      00278 #define WRITE       0xE3        ; communication protocol
+                      00279 #define WR_OK       0xE4
+                      00280 #define WR_BAD      0xE5
+                      00281 
+                      00282 #define DATA_OK     0xE7
+                      00283 #define DATA_BAD    0xE8
+                      00284 
+                      00285 #define IDENT       0xEA
+                      00286 #define IDACK       0xEB
+                      00287 
+                      00288 #define DONE        0xED
+                      00289 
+                      00290 ;=============== Variables ====================================================
+                      00291 
+  00000020            00292 buff      EQU 0x20
+                      00293 ; RAM address 0x70 reserved for MPLAB-ICD
+  00000071            00294 amount      EQU 0x71
+  00000072            00295 chk1      EQU 0x72
+  00000073            00296 chk2      EQU 0x73
+  00000074            00297 retry     EQU 0x74
+  00000075            00298 address     EQU     0x75
+  00000077            00299 tmpaddr     EQU     0x77
+  00000079            00300 temp      EQU 0x79
+  0000007A            00301 time      EQU 0x7A
+  0000007B            00302 count     EQU     0x7B
+                      00303 ;>>> ADAPT
+  0000007C            00304 help                    EQU     0x7C
+  0000007D            00305 lcount      EQU 0x7d
+                      00306 ;>>>
+                      00307 
+                      00308 ;------------------------------------------------------------------------------
+0000                  00309     ORG     0x0000                                      ; reset vector of microcontroller
+0000   0000           00310   nop           ; for compatibility with ICD
+0001   158A 160A      00311   pagesel Main
+0003   2E8C           00312     goto    Main
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00313 
+                      00314 ;------------------------------------------------------------------------------
+1E80                  00315   ORG   LoaderStart
+1E80                  00316 TrapError
+1E80   158A 160A      00317   pagesel TrapError
+1E82   2E80           00318   goto  TrapError       ; trap for unintended running into Bootloader
+                      00319 
+1E83                  00320 UserStart
+                      00321   ; this instruction never gets overwritten
+1E83   018A           00322   clrf  PCLATH          ; set PCLATH to program page 0
+                      00323 ;>>> ADAPT
+                      00324   IFDEF __16F873A
+                      00325   nop                                             ; for quad alignment
+                      00326   ENDIF
+                      00327 ;>>>
+                      00328   ; the following 4 instructions get overwritten by user program
+1E84   158A 160A      00329   pagesel UserStart       ; set PCLATH to program page of UserStart
+1E86   2E83           00330   goto  UserStart       ; loop for first start without a user program
+                      00331 ;>>> ADAPT
+1E87   0000           00332   nop
+                      00333   IFDEF __16F873A
+                      00334   nop
+                      00335   ENDIF
+                      00336 ;>>>
+                      00337 
+                      00338 ;;;;;;;;;vvv 2005-12-22mn
+                      00339   IFDEF PICC_LITE_950
+1E88   0000           00340         nop
+1E89   0000           00341         nop
+1E8A   0000           00342         nop
+1E8B   0000           00343         nop
+                      00344         ENDIF
+                      00345 ;;;;;;;;;^^^ 2005-12-22mn
+                      00346 
+                      00347 ;------------------------------------------------------------------------------
+1E8C                  00348 Main
+1E8C   1E03           00349   btfss STATUS,NOT_TO       ; run user program after WatchDog-TimeOut
+1E8D   2E83           00350   goto UserStart
+1E8E                  00351 start
+1E8E   3090           00352   movlw 0x90          ; SPEN = 1, CREN = 1
+1E8F   0098           00353   movwf RCSTA
+1E90   1683           00354   bsf STATUS,RP0        ; bank1
+                      00355   IF HIGH_SPEED == 1        ; USART SYNC=0; SPEN=1; CREN=1; SREN=0;
+1E91   1518           00356     bsf TXSTA,BRGH                      ;       TX9=0; RX9=0; TXEN=1;
+                      00357   ELSE
+                      00358     bcf TXSTA,BRGH
+                      00359   ENDIF
+1E92   1698           00360   bsf TXSTA,TXEN
+1E93   3040           00361   movlw DIVIDER         ; baud rate generator
+1E94   0099           00362   movwf SPBRG
+                      00363   IFDEF PIN
+                      00364     bsf TRIGGER       ; for PIN:  setting of TRIS for selected pin
+                      00365     bcf STATUS,RP0
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE  8
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00366     btfss TRIGGER
+                      00367     goto    receive       ; go to bootloader
+                      00368     goto  user_restore            ; run user program
+                      00369   ELSE
+1E95   1283           00370     bcf STATUS,RP0
+1E96   3003           00371     movlw TIMEOUT+1     ; for TIME: set timeout
+1E97   00FA           00372     movwf time
+1E98   3031           00373     movlw T1SU
+1E99   0090           00374     movwf T1CON       ; TIMER1 on, internal clock, prescale T1PS
+1E9A   140C           00375     bsf     PIR1,TMR1IF
+1E9B   26F0           00376     call  getbyte       ; wait for IDENT
+1E9C   3AEA           00377     xorlw IDENT
+1E9D   1D03           00378     btfss STATUS,Z
+1E9E   2EB3           00379     goto  user_restore
+1E9F   01FA           00380     clrf  time        ; no more wait for IDENT
+1EA0   2EBA           00381     goto  inst_ident      ; bootloader identified, send of IDACK
+                      00382   ENDIF
+                      00383 
+                      00384 ;------------------------------------------------------------------------------
+1EA1                  00385 receive             ; programming
+1EA1   26F0           00386   call  getbyte         ; get byte from USART
+1EA2   00F9           00387   movwf temp
+1EA3   3AE3           00388   xorlw WRITE
+1EA4   1903           00389   btfsc STATUS,Z
+1EA5   2EBC           00390   goto  inst_write        ; write instruction
+1EA6   0879           00391   movf  temp,w
+1EA7   3AEA           00392   xorlw IDENT
+1EA8   1903           00393   btfsc STATUS,Z
+1EA9   2EBA           00394   goto  inst_ident        ; identification instruction
+1EAA   0879           00395   movf  temp,w
+1EAB   3AED           00396   xorlw DONE
+1EAC   1D03           00397   btfss STATUS,Z        ; done instruction ?
+1EAD   2EA1           00398   goto  receive
+                      00399 
+                      00400 ;------------------------------------------------------------------------------
+1EAE                  00401 inst_done           ; very end of programming
+                      00402 ;------------------------------------------------------------------------------
+1EAE   30E4           00403   movlw WR_OK
+1EAF   26EB           00404     call  putbyte         ; send of byte
+1EB0   3003           00405   movlw TIMEOUT+1
+1EB1   00FA           00406   movwf time
+1EB2   26F0           00407     call  getbyte                                 ; has built in timeout - waits until done
+                      00408 ;------------------------------------------------------------------------------
+1EB3                  00409 user_restore
+1EB3   0190           00410   clrf    T1CON         ; shuts off TIMER1
+1EB4   0198           00411   clrf    RCSTA
+1EB5   1683           00412   bsf     STATUS,RP0
+1EB6   0198           00413   clrf    TXSTA         ; restores USART to reset condition
+1EB7   1283           00414   bcf     STATUS,RP0
+1EB8   018C           00415   clrf    PIR1
+1EB9   2E83           00416   goto  UserStart       ; run user program
+                      00417 
+                      00418 ;------------------------------------------------------------------------------
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE  9
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+1EBA                  00419 inst_ident
+1EBA   30EB           00420   movlw IDACK         ; send IDACK
+1EBB   2EE9           00421   goto  send_byte
+                      00422 ;------------------------------------------------------------------------------
+1EBC                  00423 inst_write
+1EBC   26F0           00424   call  getbyte
+1EBD   00F6           00425   movwf address+1       ; high byte of address
+1EBE   26F0           00426   call  getbyte
+1EBF   00F5           00427   movwf address         ; low byte of address
+1EC0   26F0           00428   call  getbyte
+1EC1   00F1           00429   movwf amount          ; number of bytes -> amount -> count
+1EC2   00FB           00430   movwf   count
+1EC3   26F0           00431   call  getbyte         ; checksum -> chk2
+1EC4   00F3           00432   movwf chk2
+1EC5   01F2           00433   clrf  chk1          ; chk1 = 0
+                      00434 
+                      00435 ;>>> ADAPT1.2
+1EC6   3021           00436   movlw 0x21          ; if (0x2100 <= tmpaddr <= 0x21FF) ..........
+1EC7   1283 1303      00437   banksel address
+1EC9   0276           00438   subwf address+1,w
+1ECA   1903           00439   btfsc STATUS,Z
+1ECB   2ED5           00440   goto  adapt12_1end        ; no action if data eeprom
+                      00441 
+1ECC   0875           00442   movf  address,w
+1ECD   3903           00443   andlw 0x03          ; Bit 0,1 der Startadresse
+1ECE   00FC           00444   movwf help
+1ECF   00FD           00445   movwf lcount          ; Zähler für späteres Lesen
+1ED0   1003           00446   bcf STATUS,C
+1ED1   0DFC           00447   rlf help          ; buffer-offset: (adress & 0x03) * 2
+1ED2   3020           00448   movlw buff
+1ED3   077C           00449   addwf help,w
+1ED4   2ED6           00450   goto  adapt12_2end
+1ED5                  00451 adapt12_1end            ; no action if data eeprom
+1ED5   3020           00452   movlw   buff
+1ED6                  00453 adapt12_2end            ; no action if data eeprom
+1ED6   0084           00454   movwf   FSR
+                      00455 ;>>> ADAPT1.2 end
+                      00456               ; FSR pointer = buff
+1ED7                  00457 receive_data
+1ED7   26F0           00458   call  getbyte         ; receive next byte -> buff[FSR]
+1ED8   0080           00459   movwf INDF
+1ED9   07F2           00460   addwf chk1,f          ; chk1 := chk1 + buff[FSR]
+1EDA   0A84           00461   incf    FSR,f         ; FSR++
+1EDB   0BFB           00462   decfsz  count,f
+1EDC   2ED7           00463   goto receive_data       ; repeat until (--count==0)
+1EDD                  00464 checksum
+1EDD   0872           00465   movf  chk1,w
+1EDE   0673           00466   xorwf chk2,w          ; if (chk1 != chk2)
+1EDF   30E8           00467   movlw   DATA_BAD
+1EE0   1D03           00468   btfss STATUS,Z
+1EE1   2EE9           00469   goto  send_byte       ; checksum WRONG
+1EE2                  00470 checksum_ok
+1EE2   30E7           00471   movlw DATA_OK         ; checksum OK
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 10
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+1EE3   26EB           00472   call  putbyte
+1EE4                  00473 write_byte
+1EE4   2702           00474   call  write_eeprom        ; write to eeprom
+1EE5   3800           00475   iorlw 0
+1EE6   30E4           00476   movlw   WR_OK         ; writing OK
+1EE7   1903           00477   btfsc STATUS,Z
+1EE8   30E5           00478   movlw WR_BAD          ; writing WRONG
+                      00479 
+                      00480 ;------------------------------------------------------------------------------
+1EE9                  00481 send_byte
+1EE9   26EB           00482   call  putbyte         ; send of byte
+1EEA   2EA1           00483   goto  receive         ; go to receive from UART
+                      00484 ;------------------------------------------------------------------------------
+                      00485 
+                      00486 ;************************* putbyte subroutine *********************************
+1EEB                  00487 putbyte
+1EEB   0064           00488   clrwdt
+1EEC   1E0C           00489   btfss PIR1,TXIF       ; while(!TXIF)
+1EED   2EEB           00490   goto  putbyte
+1EEE   0099           00491   movwf TXREG         ; TXREG = byte
+1EEF   0008           00492   return
+                      00493 
+                      00494 ;************************* getbyte subroutine *********************************
+1EF0                  00495 getbyte
+1EF0   0064           00496   clrwdt
+                      00497   IFNDEF PIN          ; for TIME
+1EF1   087A           00498     movf  time,w
+1EF2   1903           00499     btfsc STATUS,Z      ; check for time==0
+1EF3   2EFE           00500     goto  getbyte3
+1EF4   1C0C           00501     btfss PIR1,TMR1IF     ; check for TIMER1 overflow
+1EF5   2EFE           00502     goto  getbyte3      ; no overflow
+1EF6   1010           00503     bcf T1CON,TMR1ON      ; timeout 0.1 sec
+1EF7   0BFA           00504     decfsz  time,f        ; time--
+1EF8   2EFA           00505     goto  getbyte2
+1EF9   3400           00506     retlw   0       ; if time==0 then return
+1EFA                  00507 getbyte2
+1EFA   100C           00508     bcf PIR1,TMR1IF
+1EFB   300B           00509     movlw high TIMER
+1EFC   008F           00510     movwf TMR1H       ; preset TIMER1 for 0.1s timeout
+1EFD   1410           00511     bsf T1CON,TMR1ON
+                      00512   ENDIF
+1EFE                  00513 getbyte3
+1EFE   1E8C           00514   btfss PIR1,RCIF       ; while(!RCIF)
+1EFF   2EF0           00515   goto  getbyte
+1F00   081A           00516   movf  RCREG,w         ; RCREG
+1F01   0008           00517   return
+                      00518 
+                      00519 ;******************** write eeprom subroutine *********************************
+1F02                  00520 write_eeprom
+                      00521 
+                      00522 ;>>> ADAPT1.2
+1F02   3021           00523   movlw 0x21          ; if (0x2100 <= tmpaddr <= 0x21FF) ..........
+1F03   0276           00524   subwf address+1,w
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 11
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+1F04   1903           00525   btfsc STATUS,Z
+1F05   2F54           00526   goto  adapt12_3end        ; no action if data eeprom
+                      00527 
+1F06   1683 1703      00528   banksel EECON1
+1F08   178C           00529   bsf EECON1,EEPGD        ; EEPGD = 1 -> program memory
+1F09   1283 1303      00530   banksel address
+1F0B   0875           00531   movf  address,w
+1F0C   39FC           00532   andlw 0xfc
+1F0D   1703           00533   bsf STATUS,RP1
+1F0E   008D           00534   movwf EEADR         ; EEADR = low addr
+1F0F   1303           00535   bcf STATUS,RP1
+1F10   0876           00536   movf  address+1,w
+1F11   1703           00537   bsf STATUS,RP1
+1F12   008F           00538   movwf EEADRH          ; EEADRH = high addr
+1F13   3020           00539   movlw   buff
+1F14   0084           00540   movwf   FSR
+                      00541 
+                      00542 ;read memory and write to buffer front
+1F15                  00543 adapt12_loop1
+1F15   1303           00544   bcf STATUS,RP1
+1F16   087D           00545   movf  lcount,w
+1F17   1903           00546   btfsc STATUS,Z
+1F18   2F2C           00547   goto  adapt12_4end        ; no more read operation from Flash Memory
+1F19   1683 1703      00548   banksel EECON1
+1F1B   140C           00549   bsf EECON1,RD
+1F1C   0000           00550   nop
+1F1D   0000           00551   nop
+1F1E   1283           00552   bcf STATUS,RP0
+1F1F   080E           00553   movf    EEDATH,w
+1F20   0080           00554   movwf INDF
+1F21   0A84           00555   incf    FSR,f         ; FSR++
+1F22   080C           00556   movf    EEDATA,w
+1F23   0080           00557   movwf INDF
+1F24   0A84           00558   incf    FSR,f         ; FSR++
+1F25   0A8D           00559   incf  EEADR
+1F26   1303           00560   bcf STATUS,RP1
+1F27   03FD           00561   decf  lcount
+1F28   03F5           00562   decf  address
+1F29   0AF1           00563   incf  amount
+1F2A   0AF1           00564   incf  amount
+1F2B   2F15           00565   goto  adapt12_loop1
+                      00566 
+                      00567 ;read memory and write to buffer tail
+1F2C                  00568 adapt12_4end
+1F2C   0871           00569   movf  amount,w
+1F2D   00FC           00570   movwf help
+1F2E   3E20           00571   addlw buff          ; Schreibadresse in Puffer
+1F2F   0084           00572   movwf FSR
+1F30   1003           00573   bcf STATUS,C
+1F31   0CFC           00574   rrf help          ; Anzahl der Programmwoerter
+                      00575 
+1F32   0876           00576   movf  address+1,w
+1F33   1703           00577   bsf STATUS,RP1
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 12
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+1F34   008F           00578   movwf EEADRH
+1F35   1303           00579   bcf STATUS,RP1
+1F36   0875           00580   movf  address,w
+1F37   1703           00581   bsf STATUS,RP1
+1F38   008D           00582   movwf EEADR         ; EEADR/EEADRH steht auf erster zu schreibender Adresse
+1F39   1303           00583   bcf STATUS,RP1
+1F3A   087C           00584   movf  help,w
+1F3B   1703           00585   bsf STATUS,RP1
+1F3C   078D           00586   addwf EEADR,f
+1F3D   1903           00587   btfsc STATUS,Z
+1F3E   0A8F           00588   incf  EEADRH,f
+                      00589 
+1F3F                  00590 adapt12_loop2
+1F3F   1703           00591   bsf STATUS,RP1
+1F40   080D           00592   movf  EEADR,w
+1F41   3903           00593   andlw 0x03          ; while (EEADR & 0x03) != 0
+1F42   1903           00594   btfsc STATUS,Z
+1F43   2F54           00595   goto  adapt12_3end
+                      00596 
+1F44   1683           00597   bsf STATUS,RP0
+1F45   140C           00598   bsf EECON1,RD
+1F46   0000           00599   nop
+1F47   0000           00600   nop
+1F48   1283           00601   bcf STATUS,RP0
+1F49   080E           00602   movf    EEDATH,w
+1F4A   0080           00603   movwf INDF
+1F4B   0A84           00604   incf    FSR,f         ; FSR++
+1F4C   080C           00605   movf    EEDATA,w
+1F4D   0080           00606   movwf INDF
+1F4E   0A84           00607   incf    FSR,f         ; FSR++
+1F4F   0A8D           00608   incf  EEADR
+1F50   1303           00609   bcf STATUS,RP1
+1F51   0AF1           00610   incf  amount
+1F52   0AF1           00611   incf  amount
+1F53   2F3F           00612   goto  adapt12_loop2
+1F54                  00613 adapt12_3end
+                      00614 ;>>> ADAPT1.2 end
+                      00615 
+1F54   0875           00616   movf  address,w
+1F55   00F7           00617   movwf tmpaddr         ; tmpaddr = address
+1F56   0876           00618   movf  address+1,w
+1F57   00F8           00619   movwf tmpaddr+1
+1F58   01FB           00620   clrf  count         ; count=0
+1F59                  00621 write_loop
+1F59   3002           00622   movlw NumRetries+1        ; retry = NumRetries+1
+1F5A   00F4           00623   movwf retry
+1F5B                  00624 w_e_l_1
+1F5B   0871           00625   movf  amount,w
+1F5C   027B           00626   subwf count,w         ; while (count<amount)
+1F5D   1803           00627   btfsc STATUS,C
+1F5E   3401           00628   retlw 1
+1F5F   087B           00629   movf  count,w
+1F60   3E20           00630   addlw buff          ; set buffer pointer
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 13
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+1F61   0084           00631   movwf FSR
+1F62                  00632 w_e_l_2
+1F62   3021           00633   movlw 0x21          ; if (0x2100 <= tmpaddr <= 0x21FF) ..........
+1F63   0278           00634   subwf tmpaddr+1,w
+1F64   1703           00635   bsf STATUS,RP1
+1F65   1683           00636   bsf STATUS,RP0        ; (bank3)
+1F66   1903           00637   btfsc STATUS,Z
+1F67   2F72           00638    goto data_eeprom       ; goto data_eeprom
+1F68                  00639 program_eeprom
+1F68   178C           00640   bsf   EECON1,EEPGD      ; EEPGD = 1 -> program memory
+1F69   0183           00641   clrf  STATUS
+1F6A   301E           00642   movlw high (LoaderStart)      ; if (tmpaddr >= LoaderStart) ...............
+1F6B   0278           00643   subwf tmpaddr+1,w
+1F6C   3080           00644   movlw low (LoaderStart)     ; mask Booloader, [ICD-Debugger],
+1F6D   1903           00645   btfsc STATUS,Z        ;      __IDLOCS & __CONFIG
+1F6E   0277           00646   subwf tmpaddr,w
+1F6F   1803           00647   btfsc STATUS,C
+1F70   2FBA           00648   goto  next_adr        ; next address
+1F71   2F74           00649   goto    w_e_l_3
+1F72                  00650 data_eeprom
+1F72   138C           00651   bcf EECON1,EEPGD        ; EEPGD = 0 -> data memory
+1F73   0183           00652   clrf  STATUS
+1F74                  00653 w_e_l_3
+1F74   0877           00654   movf  tmpaddr,w
+1F75   1703           00655   bsf STATUS,RP1
+1F76   008D           00656   movwf EEADR         ; EEADR = low tmpaddr
+1F77   1303           00657   bcf STATUS,RP1
+1F78   0878           00658   movf  tmpaddr+1,w       ; if (tmpaddr < 0x0004) .....................
+1F79   1D03           00659   btfss   STATUS,Z
+1F7A   2F89           00660   goto  w_e_l_4
+                      00661 ;;;;;;;;;vvv 2005-12-22mn
+                      00662   IFDEF PICC_LITE_950
+1F7B   3008           00663   movlw 8
+                      00664         ELSE
+                      00665   movlw 4
+                      00666         ENDIF
+                      00667 ;;;;;;;;;^^^ 2005-12-22mn
+1F7C   0277           00668   subwf tmpaddr,w
+1F7D   1803           00669   btfsc STATUS,C
+1F7E   2F89           00670   goto  w_e_l_4
+1F7F   1703           00671   bsf   STATUS,RP1                      ; (bank3)
+1F80   1683           00672   bsf   STATUS,RP0
+1F81   1F8C           00673   btfss   EECON1,EEPGD                  ; skip if (EEPGD)
+1F82   2F86           00674   goto  w_e_l_31
+1F83   1283           00675   bcf STATUS,RP0                      ; (bank2)
+                      00676 ;>>> ADAPT
+                      00677   IFDEF __16F873A
+                      00678     movlw low UserStart+2           ; EEADRL + low UserStart+2
+                      00679     ELSE
+                      00680     IFDEF __16F876A
+                      00681       movlw low UserStart+1         ; EEADRL + low UserStart+1
+                      00682         ELSE
+                      00683       IFDEF __16F877A
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 14
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+1F84   3084           00684         movlw low UserStart+1       ; EEADRL + low UserStart+1
+                      00685           ELSE
+                      00686               ERROR   "incorrect type of microcontroller"
+                      00687           ENDIF
+                      00688         ENDIF
+                      00689       ENDIF
+                      00690 ;>>>
+1F85   078D           00691   addwf   EEADR,f                       ; (relocated first 4 user instructions)
+1F86                  00692 w_e_l_31
+1F86   0183           00693   clrf  STATUS                        ; (bank0)
+1F87   301E           00694   movlw high UserStart        ; EEADRH = high UserStart
+1F88   2F8A           00695   goto  w_e_l_5
+1F89                  00696 w_e_l_4
+1F89   0878           00697   movf  tmpaddr+1,w       ; EEADRH = high tmpaddr
+1F8A                  00698 w_e_l_5
+1F8A   1703           00699   bsf STATUS,RP1
+1F8B   008F           00700   movwf EEADRH          ; set EEADRH
+1F8C   0800           00701   movf  INDF,w
+1F8D   008E           00702   movwf EEDATH          ; EEDATH = buff[count]
+1F8E   0A84           00703   incf    FSR,f
+1F8F   0800           00704   movf    INDF,w
+1F90   008C           00705   movwf EEDATA          ; EEDATA = buff[count+1]
+1F91   1683           00706   bsf STATUS,RP0
+1F92   150C           00707   bsf EECON1,WREN       ; WREN=1
+1F93   3055           00708   movlw 0x55          ; EECON2 = 0x55
+1F94   008D           00709   movwf EECON2
+1F95   30AA           00710   movlw 0xAA          ; EECON2 = 0xAA
+1F96   008D           00711   movwf EECON2
+1F97   148C           00712   bsf EECON1,WR       ; WR=1
+1F98   0000           00713   nop           ; instructions are ignored
+1F99   0000           00714   nop           ; microcontroller waits for a complete write
+1F9A   0183           00715   clrf  STATUS
+                      00716 
+                      00717 ;>>> ADAPT
+1F9B   1683 1703      00718   banksel EECON1
+1F9D   1B8C           00719   btfsc   EECON1,EEPGD                  ; skip if (EEPGD=0 / write to EEPROM)
+1F9E   2FC2           00720   goto  ver_flash
+                      00721 ;>>>
+                      00722 
+1F9F   1283 1303      00723   banksel PIR2
+1FA1                  00724 wait_write
+1FA1   0064           00725   clrwdt
+1FA2   1E0D           00726   btfss PIR2,EEIF       ; necessary for a write to data eeprom
+1FA3   2FA1           00727   goto  wait_write
+1FA4   120D           00728   bcf PIR2,EEIF
+1FA5   1683           00729   bsf   STATUS,RP0        ; (bank3)
+1FA6   1703           00730   bsf   STATUS,RP1
+1FA7   110C           00731   bcf EECON1,WREN       ; WREN=0
+                      00732 
+                      00733 
+1FA8   140C           00734   bsf EECON1,RD       ; RD=1
+1FA9   0000           00735   nop
+1FAA   0000           00736   nop
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 15
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+1FAB   1283           00737   bcf   STATUS,RP0        ; (bank2)
+1FAC   0384           00738   decf    FSR,f
+1FAD   0800           00739   movf    INDF,w          ; if ((EEDATH != buff[count]) || (EEDATA != buff[count+1]))
+1FAE   060E           00740   xorwf   EEDATH,w
+1FAF   1D03           00741   btfss   STATUS,Z
+1FB0   2FB6           00742   goto  w_e_l_6         ; repeat write
+1FB1   0A84           00743   incf    FSR,f
+1FB2   0800           00744   movf    INDF,w
+1FB3   060C           00745   xorwf   EEDATA,w
+1FB4   1903           00746   btfsc STATUS,Z
+1FB5   2FBA           00747   goto  next_adr        ; verification OK, next address
+1FB6                  00748 w_e_l_6
+1FB6   0183           00749   clrf  STATUS          ; (bank0)
+1FB7   0BF4           00750   decfsz  retry,f
+1FB8   2F5B           00751   goto  w_e_l_1         ; if (--retry != 0) repeat write
+1FB9   3400           00752   retlw 0         ; else return 0 (BAD)
+1FBA                  00753 next_adr
+                      00754 ;>>> ADAPT
+1FBA   1283 1303      00755       banksel count
+                      00756 ; bcf   STATUS,RP1
+                      00757 ;>>>
+1FBC   3002           00758   movlw 2         ; count := count + 2
+1FBD   07FB           00759   addwf count,f
+1FBE   0AF7           00760   incf  tmpaddr,f       ; tmpaddr := tmpaddr + 1
+1FBF   1903           00761   btfsc STATUS,Z
+1FC0   0AF8           00762   incf  tmpaddr+1,f
+1FC1   2F59           00763   goto  write_loop
+                      00764 
+                      00765 ;>>> ADAPT
+1FC2                  00766 ver_flash
+1FC2   1283 1303      00767   banksel PIR2
+1FC4   120D           00768   bcf PIR2,EEIF
+1FC5   1683 1703      00769   banksel EECON1
+1FC7   110C           00770   bcf EECON1,WREN       ; WREN=0
+                      00771 
+1FC8   1283 1703      00772       banksel EEADR
+1FCA   080D           00773       movf    EEADR,w
+1FCB   3903           00774       andlw   0x03
+1FCC   3C03           00775       sublw   0x03
+1FCD   1D03           00776       btfss   STATUS,Z
+1FCE   2FBA           00777       goto    next_adr              ; if (EEADR & 0x03) = 0x03
+                      00778 
+1FCF   3003           00779       movlw   3
+1FD0   028D           00780       subwf   EEADR,f               ; EEADR <- EEADR - 3
+                      00781 
+1FD1   1283 1303      00782       banksel help
+1FD3   3004           00783       movlw   4
+1FD4   00FC           00784       movwf   help                  ; help <- 4
+                      00785 
+1FD5   3007           00786       movlw   7
+1FD6   0284           00787       subwf   FSR,f                 ; FSR <- FSR - 7
+                      00788 
+1FD7                  00789 ver_fl_1
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 16
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+1FD7   0000           00790       nop
+1FD8   1683 1703      00791   banksel EECON1
+1FDA   140C           00792   bsf EECON1,RD       ; RD=1
+1FDB   0000           00793   nop
+1FDC   0000           00794   nop
+1FDD   0000           00795   nop
+1FDE   0000           00796   nop
+1FDF   0000           00797   nop
+1FE0   0000           00798   nop
+                      00799 
+1FE1   0800           00800   movf    INDF,w          ; if ((EEDATH != buff[count]) || (EEDATA != buff[count+1]))
+1FE2   1283 1703      00801   banksel EEDATH
+1FE4   060E           00802   xorwf   EEDATH,w
+1FE5   1D03           00803   btfss   STATUS,Z
+1FE6   2FEC           00804   goto  ver_fl_2        ; repeat write
+1FE7   0A84           00805   incf    FSR,f
+1FE8   0800           00806   movf    INDF,w
+1FE9   060C           00807   xorwf   EEDATA,w
+1FEA   1903           00808   btfsc STATUS,Z
+1FEB   2FF3           00809   goto  ver_fl_3
+1FEC                  00810 ver_fl_2                            ; invalid verify
+1FEC   1283 1303      00811       banksel tmpaddr
+1FEE   30FC           00812       movlw   0x0fc
+1FEF   05F7           00813       andwf   tmpaddr,f             ; clear least significant two bits in [tmpaddr]
+                      00814 
+1FF0   3006           00815       movlw   6
+1FF1   02FB           00816       subwf   count,f                 ; count <- count - 6
+                      00817 
+1FF2   2FB6           00818       goto    w_e_l_6
+                      00819 
+1FF3                  00820 ver_fl_3
+1FF3   1283 1703      00821       banksel EEADR
+1FF5   0A8D           00822   incf    EEADR,f
+1FF6   0A84           00823   incf    FSR,f
+                      00824 
+1FF7   1283 1303      00825       banksel help
+1FF9   0BFC           00826       decfsz  help,f
+1FFA   2FD7           00827       goto    ver_fl_1
+1FFB   2FBA           00828     goto    next_adr
+                      00829 
+                      00830 ;>>>
+                      00831 
+                      00832 
+                      00833 
+                      00834 ;------------------------------------------------------------------------------
+                      00835   END
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 17
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ACKDT                             00000005
+ACKEN                             00000004
+ACKSTAT                           00000006
+ADCON0                            0000001F
+ADCON1                            0000009F
+ADCS0                             00000006
+ADCS1                             00000007
+ADDEN                             00000003
+ADFM                              00000007
+ADIE                              00000006
+ADIF                              00000006
+ADON                              00000000
+ADRESH                            0000001E
+ADRESL                            0000009E
+BAUD                              D'19200'
+BAUD_ERROR                        D'4'
+BAUD_REAL                         00004B1E
+BCLIE                             00000003
+BCLIF                             00000003
+BF                                00000000
+BRGH                              00000002
+C                                 00000000
+C1INV                             00000004
+C1OUT                             00000006
+C2INV                             00000005
+C2OUT                             00000007
+CCP1CON                           00000017
+CCP1IE                            00000002
+CCP1IF                            00000002
+CCP1M0                            00000000
+CCP1M1                            00000001
+CCP1M2                            00000002
+CCP1M3                            00000003
+CCP1X                             00000005
+CCP1Y                             00000004
+CCP2CON                           0000001D
+CCP2IE                            00000000
+CCP2IF                            00000000
+CCP2M0                            00000000
+CCP2M1                            00000001
+CCP2M2                            00000002
+CCP2M3                            00000003
+CCP2X                             00000005
+CCP2Y                             00000004
+CCPR1H                            00000016
+CCPR1L                            00000015
+CCPR2H                            0000001C
+CCPR2L                            0000001B
+CHS0                              00000003
+CHS1                              00000004
+CHS2                              00000005
+CIS                               00000003
+CKE                               00000006
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 18
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+CKP                               00000004
+CM0                               00000000
+CM1                               00000001
+CM2                               00000002
+CMCON                             0000009C
+CMIE                              00000006
+CMIF                              00000006
+CREN                              00000004
+CSRC                              00000007
+CVR0                              00000000
+CVR1                              00000001
+CVR2                              00000002
+CVR3                              00000003
+CVRCON                            0000009D
+CVREN                             00000007
+CVROE                             00000006
+CVRR                              00000005
+D                                 00000005
+DATA_ADDRESS                      00000005
+DATA_BAD                          0xE8
+DATA_OK                           0xE7
+DC                                00000001
+DIVIDER                           (FOSC/(D'16' * BAUD))-1
+DONE                              0xED
+D_A                               00000005
+EEADR                             0000010D
+EEADRH                            0000010F
+EECON1                            0000018C
+EECON2                            0000018D
+EEDATA                            0000010C
+EEDATH                            0000010E
+EEIE                              00000004
+EEIF                              00000004
+EEPGD                             00000007
+F                                 00000001
+FERR                              00000002
+FOSC                              D'20000000'
+FSR                               00000004
+GCEN                              00000007
+GIE                               00000007
+GO                                00000002
+GO_DONE                           00000002
+HIGH_SPEED                        1
+I2C_DATA                          00000005
+I2C_READ                          00000002
+I2C_START                         00000003
+I2C_STOP                          00000004
+IBF                               00000007
+IBOV                              00000005
+ICD_DEBUG                         0
+IDACK                             0xEB
+IDENT                             0xEA
+INDF                              00000000
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 19
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+IRP                               00000007
+LoaderSize                        0x180
+LoaderStart                       (LoaderTop)-LoaderSize+1
+LoaderTop                         ProgHI-(ICD_DEBUG*0x100)
+MY_WDT                            _WDT_OFF
+Main                              00001E8C
+NOT_A                             00000005
+NOT_ADDRESS                       00000005
+NOT_BO                            00000000
+NOT_BOR                           00000000
+NOT_DONE                          00000002
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RBPU                          00000007
+NOT_RC8                           00000006
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+NOT_TX8                           00000006
+NOT_W                             00000002
+NOT_WRITE                         00000002
+NumRetries                        1
+OBF                               00000006
+OERR                              00000001
+OPTION_REG                        00000081
+P                                 00000004
+PCFG0                             00000000
+PCFG1                             00000001
+PCFG2                             00000002
+PCFG3                             00000003
+PCL                               00000002
+PCLATH                            0000000A
+PCON                              0000008E
+PEIE                              00000006
+PEN                               00000002
+PICC_LITE_950                     
+PIE1                              0000008C
+PIE2                              0000008D
+PIR1                              0000000C
+PIR2                              0000000D
+PORTA                             00000005
+PORTB                             00000006
+PORTC                             00000007
+PORTD                             00000008
+PORTE                             00000009
+PR2                               00000092
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 20
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+PSPIE                             00000007
+PSPIF                             00000007
+PSPMODE                           00000004
+ProgHI                            0x1FFF
+R                                 00000002
+RBIE                              00000003
+RBIF                              00000000
+RC8_9                             00000006
+RC9                               00000006
+RCD8                              00000000
+RCEN                              00000003
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             0000001A
+RCSTA                             00000018
+RD                                00000000
+READ_WRITE                        00000002
+RP0                               00000005
+RP1                               00000006
+RSEN                              00000001
+RX9                               00000006
+RX9D                              00000000
+R_W                               00000002
+S                                 00000003
+SEN                               00000000
+SMP                               00000007
+SPBRG                             00000099
+SPEN                              00000007
+SREN                              00000005
+SSPADD                            00000093
+SSPBUF                            00000013
+SSPCON                            00000014
+SSPCON2                           00000091
+SSPEN                             00000005
+SSPIE                             00000003
+SSPIF                             00000003
+SSPM0                             00000000
+SSPM1                             00000001
+SSPM2                             00000002
+SSPM3                             00000003
+SSPOV                             00000006
+SSPSTAT                           00000094
+STATUS                            00000003
+SYNC                              00000004
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000010
+T1INSYNC                          00000002
+T1OSCEN                           00000003
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 21
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+T1PS                              8
+T1SU                              0x31
+T1SYNC                            00000002
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             00000012
+TIME                              
+TIMEOUT                           D'2'
+TIMER                             00000BDE
+TMR0                              00000001
+TMR0IE                            00000005
+TMR0IF                            00000002
+TMR1CS                            00000001
+TMR1H                             0000000F
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             0000000E
+TMR1ON                            00000000
+TMR2                              00000011
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOUTPS0                           00000003
+TOUTPS1                           00000004
+TOUTPS2                           00000005
+TOUTPS3                           00000006
+TRIGGER                           PORTB,7
+TRISA                             00000085
+TRISB                             00000086
+TRISC                             00000087
+TRISD                             00000088
+TRISE                             00000089
+TRISE0                            00000000
+TRISE1                            00000001
+TRISE2                            00000002
+TRMT                              00000001
+TX8_9                             00000006
+TX9                               00000006
+TX9D                              00000000
+TXD8                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+TXREG                             00000019
+TXSTA                             00000098
+TrapError                         00001E80
+UA                                00000001
+UserStart                         00001E83
+W                                 00000000
+WATCHDOGTIMER                     0
+WCOL                              00000007
+WR                                00000001
+WREN                              00000002
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 22
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+WRERR                             00000003
+WRITE                             0xE3
+WR_BAD                            0xE5
+WR_OK                             0xE4
+Z                                 00000002
+_BODEN_OFF                        00003FBF
+_BODEN_ON                         00003FFF
+_CPD_OFF                          00003FFF
+_CPD_ON                           00003EFF
+_CP_ALL                           00001FFF
+_CP_OFF                           00003FFF
+_DEBUG_OFF                        00003FFF
+_DEBUG_ON                         000037FF
+_HS_OSC                           00003FFE
+_LP_OSC                           00003FFC
+_LVP_OFF                          00003F7F
+_LVP_ON                           00003FFF
+_MYCRYSTAL                        _HS_OSC
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_RC_OSC                           00003FFF
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_WRT_1FOURTH                      00003BFF
+_WRT_256                          00003DFF
+_WRT_HALF                         000039FF
+_WRT_OFF                          00003FFF
+_XT_OSC                           00003FFD
+__16F877A                         00000001
+adapt12_1end                      00001ED5
+adapt12_2end                      00001ED6
+adapt12_3end                      00001F54
+adapt12_4end                      00001F2C
+adapt12_loop1                     00001F15
+adapt12_loop2                     00001F3F
+address                           00000075
+amount                            00000071
+buff                              00000020
+checksum                          00001EDD
+checksum_ok                       00001EE2
+chk1                              00000072
+chk2                              00000073
+count                             0000007B
+data_eeprom                       00001F72
+getbyte                           00001EF0
+getbyte2                          00001EFA
+getbyte3                          00001EFE
+help                              0000007C
+inst_done                         00001EAE
+inst_ident                        00001EBA
+inst_write                        00001EBC
+lcount                            0000007D
+next_adr                          00001FBA
+MPASM  5.00                      BOOTLDRA.ASM   12-24-2005  23:44:40         PAGE 23
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+program_eeprom                    00001F68
+putbyte                           00001EEB
+receive                           00001EA1
+receive_data                      00001ED7
+retry                             00000074
+send_byte                         00001EE9
+start                             00001E8E
+temp                              00000079
+time                              0000007A
+tmpaddr                           00000077
+user_restore                      00001EB3
+ver_fl_1                          00001FD7
+ver_fl_2                          00001FEC
+ver_fl_3                          00001FF3
+ver_flash                         00001FC2
+w_e_l_1                           00001F5B
+w_e_l_2                           00001F62
+w_e_l_3                           00001F74
+w_e_l_31                          00001F86
+w_e_l_4                           00001F89
+w_e_l_5                           00001F8A
+w_e_l_6                           00001FB6
+wait_write                        00001FA1
+write_byte                        00001EE4
+write_eeprom                      00001F02
+write_loop                        00001F59
+
+
+MEMORY USAGE MAP ('X' = Used,  '-' = Unused)
+
+0000 : XXXX------------ ---------------- ---------------- ----------------
+1E80 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+1EC0 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+1F00 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+1F40 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+1F80 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+1FC0 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXX----
+2000 : XXXX---X-------- ---------------- ---------------- ----------------
+
+All other memory blocks unused.
+
+Program Memory Words Used:   384
+Program Memory Words Free:  7808
+
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :     0 reported,    55 suppressed
+
+

@@ -1,0 +1,11 @@
+***************************
+How to compile this program
+***************************
+
+- Go to http://www.htsoft.com/
+- Look under 'Free programs' and download Pacific C for DOS.
+- Run \BIN\PPD.EXE, then use Make .. Load Project to load the .pjt file.
+- Load downldr.c by selecting File..Open, then F10 to open downldr.c
+- Turn off warnings by selecting Compile .. Stop on Warnings to OFF. This ignores the warnings. Dont
+  worry about warnings, it works fine.
+- Compile with F3 or Compile..Compile and Link.
