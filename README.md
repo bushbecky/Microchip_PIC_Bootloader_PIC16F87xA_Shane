@@ -81,7 +81,6 @@ Reset the PIC micro now, and you should see it pause for 0.2 sec, then start pri
 
 This is what it prints out:
 
-> "PICTest (c)2001 Shane Tolmie - see http://www.workingtex.com/htpic"
 > "Starting up serial @ 19200 baud, N,8,1, no flow control ..."
 > (c)2003 Shane Tolmie, shane@microchipc.com, see http://www.microchipc.com/ for more projects like this and a huge FAQ on Hi-Tech C.
 
