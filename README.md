@@ -88,4 +88,4 @@ This is what it prints out:
 
 For more sample code, see [www.MicrochipC.com](http://www.MicrochipC.com/).
 
-> Do you have any enhancements to share with the community? We honour 95% of pull requests within a few days!
+> Do you have any enhancements to share with the community? We honour 98% of pull requests within a few days!
